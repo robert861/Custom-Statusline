@@ -246,7 +246,11 @@ if [ -n "$CACHE_READ" ] && [ -n "$CACHE_CREATE" ]; then
   CACHE_TOTAL=$(( CACHE_READ + CACHE_CREATE ))
   if [ "$CACHE_TOTAL" -gt 0 ]; then
     CACHE_PCT=$(awk "BEGIN {printf \"%.0f\", ($CACHE_READ / $CACHE_TOTAL) * 100}")
-    C=$(colour_gradient "$CACHE_PCT")
+    # Inverted gradient: high cache = good (green), low = bad (red)
+    if   [ "$CACHE_PCT" -ge 90 ]; then C="${B_GREEN}"
+    elif [ "$CACHE_PCT" -ge 70 ]; then C="${B_YELLOW}"
+    else                               C="${B_RED}"
+    fi
     CACHE_SECTION="${C}Cache:${CACHE_PCT}%${RESET}"
   fi
 fi
