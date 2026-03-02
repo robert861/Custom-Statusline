@@ -185,20 +185,20 @@ MCP_NAMES=""
 
 # Cloud MCP servers (filter to relevant ones only)
 MCP_DATA=$(_load_mcp 2>/dev/null)
+CLOUD_MCP=""
 if [ -n "$MCP_DATA" ]; then
-  MCP_NAMES=$(printf '%s' "$MCP_DATA" | jq -r '.data[].display_name' 2>/dev/null | tr -d '\r' | while read -r name; do
+  CLOUD_MCP=$(printf '%s' "$MCP_DATA" | jq -r '.data[].display_name' 2>/dev/null | tr -d '\r' | while read -r name; do
     case "$name" in
-      monday.com|Monday*) printf "Mon " ;;
+      monday.com|Monday*) printf "\033[1;32mMon\033[0m " ;;
       Gmail*|Google*Calendar*) ;;  # skip — not needed
-      *)                  printf "%s " "$(echo "$name" | cut -c1-4)" ;;
+      *)                  printf "\033[1;32m%s\033[0m " "$(echo "$name" | cut -c1-4)" ;;
     esac
   done | sed 's/ $//')
 fi
 
-# Local MCP: NITA (check if uvicorn is listening on port 8000)
+# Local MCP: NITA (check if mcp_stdio.py process is running — stdio transport)
 NITA_STATUS=""
-if netstat -ano 2>/dev/null | grep -q ':8000.*LISTENING' || \
-   ss -tlnp 2>/dev/null | grep -q ':8000'; then
+if wmic process where "name='python.exe'" get CommandLine 2>/dev/null | grep -q "mcp_stdio"; then
   NITA_STATUS="${B_GREEN}NITA${RESET}"
 else
   NITA_STATUS="${B_RED}NITA${RESET}"
@@ -206,12 +206,12 @@ fi
 
 # Combine
 MCP_PARTS=""
-[ -n "$MCP_NAMES" ] && MCP_PARTS="$MCP_NAMES"
+[ -n "$CLOUD_MCP" ] && MCP_PARTS="$CLOUD_MCP"
 if [ -n "$NITA_STATUS" ]; then
   [ -n "$MCP_PARTS" ] && MCP_PARTS="${MCP_PARTS} "
   MCP_PARTS="${MCP_PARTS}${NITA_STATUS}"
 fi
-[ -n "$MCP_PARTS" ] && MCP_SECTION="${B_GREEN}MCP:${RESET}${DIM}${MCP_PARTS}${RESET}"
+[ -n "$MCP_PARTS" ] && MCP_SECTION="${B_GREEN}MCP:${RESET}${MCP_PARTS}"
 
 # ─── Session duration ─────────────────────────────────────────────────────────
 DURATION_SECTION=""
