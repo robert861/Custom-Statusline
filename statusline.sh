@@ -154,64 +154,17 @@ if [ -n "$WEATHER_DATA" ]; then
   fi
 fi
 
-# ─── MCP servers (cached 5 min) ──────────────────────────────────────────────
-MCP_SECTION=""
-MCP_CACHE="$HOME/.claude/mcp_status_cache.json"
-MCP_TTL=300
-
-_load_mcp() {
-  local data="" now age mod_time
-  if [ -f "$MCP_CACHE" ]; then
-    now=$(date +%s)
-    mod_time=$(stat -c %Y "$MCP_CACHE" 2>/dev/null || stat -f %m "$MCP_CACHE" 2>/dev/null || echo 0)
-    age=$(( now - mod_time ))
-    [ "$age" -lt "$MCP_TTL" ] && data=$(cat "$MCP_CACHE" 2>/dev/null)
-  fi
-  if [ -z "$data" ]; then
-    local token
-    token=$(jq -r '.claudeAiOauth.accessToken // empty' "$HOME/.claude/.credentials.json" 2>/dev/null)
-    [ -z "$token" ] && return 1
-    data=$(curl -sf --max-time 3 \
-      -H "Authorization: Bearer $token" \
-      -H "anthropic-beta: mcp-servers-2025-12-04" \
-      -H "anthropic-version: 2023-06-01" \
-      "https://api.anthropic.com/v1/mcp_servers?limit=1000" 2>/dev/null)
-    [ -n "$data" ] && printf '%s' "$data" > "$MCP_CACHE" 2>/dev/null
-  fi
-  [ -n "$data" ] && printf '%s' "$data"
-}
-
-MCP_NAMES=""
-
-# Cloud MCP servers (filter to relevant ones only)
-MCP_DATA=$(_load_mcp 2>/dev/null)
-if [ -n "$MCP_DATA" ]; then
-  MCP_NAMES=$(printf '%s' "$MCP_DATA" | jq -r '.data[].display_name' 2>/dev/null | tr -d '\r' | while read -r name; do
-    case "$name" in
-      monday.com|Monday*) printf "Mon " ;;
-      Gmail*|Google*Calendar*) ;;  # skip — not needed
-      *)                  printf "%s " "$(echo "$name" | cut -c1-4)" ;;
-    esac
-  done | sed 's/ $//')
+# ─── Effort level (from settings.json) ────────────────────────────────────────
+EFFORT_SECTION=""
+EFFORT_LEVEL=$(jq -r '.effortLevel // empty' "$HOME/.claude/settings.json" 2>/dev/null)
+if [ -n "$EFFORT_LEVEL" ]; then
+  case "$EFFORT_LEVEL" in
+    high)   EFFORT_SECTION="${B_GREEN}Hi${RESET}" ;;
+    medium) EFFORT_SECTION="${B_YELLOW}Med${RESET}" ;;
+    low)    EFFORT_SECTION="${DIM}Lo${RESET}" ;;
+    *)      EFFORT_SECTION="${DIM}${EFFORT_LEVEL}${RESET}" ;;
+  esac
 fi
-
-# Local MCP: NITA (check if uvicorn is listening on port 8000)
-NITA_STATUS=""
-if netstat -ano 2>/dev/null | grep -q ':8000.*LISTENING' || \
-   ss -tlnp 2>/dev/null | grep -q ':8000'; then
-  NITA_STATUS="${B_GREEN}NITA${RESET}"
-else
-  NITA_STATUS="${B_RED}NITA${RESET}"
-fi
-
-# Combine
-MCP_PARTS=""
-[ -n "$MCP_NAMES" ] && MCP_PARTS="$MCP_NAMES"
-if [ -n "$NITA_STATUS" ]; then
-  [ -n "$MCP_PARTS" ] && MCP_PARTS="${MCP_PARTS} "
-  MCP_PARTS="${MCP_PARTS}${NITA_STATUS}"
-fi
-[ -n "$MCP_PARTS" ] && MCP_SECTION="${B_GREEN}MCP:${RESET}${DIM}${MCP_PARTS}${RESET}"
 
 # ─── Session duration ─────────────────────────────────────────────────────────
 DURATION_SECTION=""
@@ -261,6 +214,12 @@ LINE1=""
 # Model name
 [ -n "$MODEL" ] && LINE1="${B_ORANGE}${MODEL}${RESET}"
 
+# Effort level (right after model)
+if [ -n "$EFFORT_SECTION" ]; then
+  [ -n "$LINE1" ] && LINE1="${LINE1} "
+  LINE1="${LINE1}${EFFORT_SECTION}"
+fi
+
 # Directory
 if [ -n "$DIR_NAME" ]; then
   [ -n "$LINE1" ] && LINE1="${LINE1}  "
@@ -284,12 +243,6 @@ fi
 if [ -n "$LINES_SECTION" ]; then
   [ -n "$LINE1" ] && LINE1="${LINE1}${SEP}"
   LINE1="${LINE1}${LINES_SECTION}"
-fi
-
-# MCP servers
-if [ -n "$MCP_SECTION" ]; then
-  [ -n "$LINE1" ] && LINE1="${LINE1}${SEP}"
-  LINE1="${LINE1}${MCP_SECTION}"
 fi
 
 # Vim mode
