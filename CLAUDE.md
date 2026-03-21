@@ -86,6 +86,16 @@ Register in `~/.claude/settings.json`:
 }
 ```
 
+## Deployment
+
+After editing `statusline.sh` in this repo, **always** copy it to the live location so changes take effect immediately:
+
+```bash
+cp statusline.sh ~/.claude/statusline.sh
+```
+
+The statusline renders on every Claude Code tick, so the update is picked up on the next render — no restart needed.
+
 ## Development & Testing
 
 ```bash
