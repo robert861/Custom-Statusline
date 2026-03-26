@@ -20,11 +20,12 @@ This is a custom statusline script for Claude Code. It runs as an external comma
 | Day and time | `date` command | `Friday 17:30` | Dim grey |
 | Vim mode | `vim.mode` | `NOR` / `INS` | Green / Yellow (only when vim enabled) |
 | Cache hit ratio | `cache_read` / `cache_creation` tokens | `Cache:87%` | Gradient (only when tokens present) |
+| Effort level | `~/.claude/settings.json` → `effortLevel` | `Hi` / `Med` / `Lo` | Green / Yellow / Dim grey |
 
 ### Layout
 
 ```
-Opus 4.6  Custom-Statusline | main ~2 +1 | Ctx:45% | NOR | Cache:87% | 14m | Friday 17:30
+Opus 4.6  Custom-Statusline | main ~2 +1 | Ctx:45% | Hi | NOR | Cache:87% | 14m | Friday 17:30
 ```
 
 ### Not Implemented — 5h/7d Usage
@@ -84,6 +85,16 @@ Register in `~/.claude/settings.json`:
   }
 }
 ```
+
+## Deployment
+
+After editing `statusline.sh` in this repo, **always** copy it to the live location so changes take effect immediately:
+
+```bash
+cp statusline.sh ~/.claude/statusline.sh
+```
+
+The statusline renders on every Claude Code tick, so the update is picked up on the next render — no restart needed.
 
 ## Development & Testing
 
