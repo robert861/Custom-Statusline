@@ -20,24 +20,19 @@ This is a custom statusline script for Claude Code. It runs as an external comma
 | Day and time | `date` command | `Friday 17:30` | Dim grey |
 | Vim mode | `vim.mode` | `NOR` / `INS` | Green / Yellow (only when vim enabled) |
 | Cache hit ratio | `cache_read` / `cache_creation` tokens | `Cache:87%` | Gradient (only when tokens present) |
-| Effort level | `~/.claude/settings.json` → `effortLevel` | `Hi` / `Med` / `Lo` | Green / Yellow / Dim grey |
+| Effort level | `.effort.level` (JSON payload) | `Max` / `XHi` / `Hi` / `Med` / `Lo` | Red / Orange / Green / Yellow / Dim grey |
+| Rate limits | `.rate_limits.{five_hour,seven_day}.used_percentage` | `5h:23% 7d:91%` | Gradient (green/yellow/orange/red) |
 
 ### Layout
 
 ```
-Opus 4.6  Custom-Statusline | main ~2 +1 | Ctx:45% | Hi | NOR | Cache:87% | 14m | Friday 17:30
+Opus 4.7 Hi  Custom-Statusline | main ~2 +1 | Ctx:45% | NOR | Cache:87%
+14m | 5h:23% 7d:91% | 16.8°C Clear | Friday 17:30
 ```
 
-### Not Implemented — 5h/7d Usage
+### Rate limits (5h / 7d)
 
-The 5-hour and 7-day rate-limit utilization cannot be fetched from an external bash script:
-
-- **OAuth API (`/api/oauth/usage`)**: Returns `{ five_hour: { utilization: 0-100 }, seven_day: { ... } }` but rejects OAuth tokens via raw HTTP (`curl`/`fetch`). Error: "OAuth authentication is currently not supported." Claude Code's internal Node.js SDK handles OAuth routing through a different code path.
-- **Response headers**: The data also arrives via `anthropic-ratelimit-unified-{5h,7d}-utilization` headers on each `/v1/messages` API call, but these only exist in Claude Code's in-memory state — never persisted to disk.
-- **Community projects** (claude-powerline, ccusage): Both parse local JSONL transcript files (`~/.claude/projects/<hash>/<session>.jsonl`) to approximate 5h usage from token counts + model pricing. Both are Node.js apps, not bash scripts.
-- **PAI (danielmiessler)**: Also does not display usage data.
-
-The feature is stubbed in the script. If Claude Code adds usage fields to the statusline JSON payload in the future, the sections will activate.
+As of Claude Code v1.2.80+, `rate_limits.five_hour.used_percentage` and `rate_limits.seven_day.used_percentage` ship in the statusline JSON payload (Pro/Max subscribers, present after the first API response in a session). Each window may be independently absent — the script uses `// empty` guards and renders whichever values are available.
 
 ### Not Working — Terminal Tab Title
 
@@ -62,6 +57,8 @@ Claude Code pipes a JSON object to the script's stdin containing fields like:
 - `.context_window.used_percentage` — context fill level (0–100)
 - `.context_window.current_usage.cache_read_input_tokens` — cache read tokens
 - `.context_window.current_usage.cache_creation_input_tokens` — cache creation tokens
+- `.effort.level` — reasoning effort (`low`/`medium`/`high`/`xhigh`/`max`); absent if model doesn't support it
+- `.rate_limits.five_hour.used_percentage`, `.rate_limits.seven_day.used_percentage` — 0–100; absent until first API call (Pro/Max only)
 - `.vim.mode` — vim mode (`NORMAL`, `INSERT`) when vim mode is enabled
 - `.version` — Claude Code version
 

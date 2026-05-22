@@ -60,6 +60,9 @@ CACHE_READ=$(get_val '.context_window.current_usage.cache_read_input_tokens')
 CACHE_CREATE=$(get_val '.context_window.current_usage.cache_creation_input_tokens')
 LINES_ADD=$(get_val '.cost.total_lines_added')
 LINES_REM=$(get_val '.cost.total_lines_removed')
+EFFORT_LEVEL=$(get_val '.effort.level')
+RL_5H=$(get_val '.rate_limits.five_hour.used_percentage')
+RL_7D=$(get_val '.rate_limits.seven_day.used_percentage')
 
 # Derived values
 DIR_NAME="${CWD##*[/\\]}"
@@ -154,16 +157,37 @@ if [ -n "$WEATHER_DATA" ]; then
   fi
 fi
 
-# ─── Effort level (from settings.json) ────────────────────────────────────────
+# ─── Effort level (from JSON payload — .effort.level) ────────────────────────
 EFFORT_SECTION=""
-EFFORT_LEVEL=$(jq -r '.effortLevel // empty' "$HOME/.claude/settings.json" 2>/dev/null)
 if [ -n "$EFFORT_LEVEL" ]; then
   case "$EFFORT_LEVEL" in
+    max)    EFFORT_SECTION="${B_RED}Max${RESET}" ;;
+    xhigh)  EFFORT_SECTION="${B_ORANGE}XHi${RESET}" ;;
     high)   EFFORT_SECTION="${B_GREEN}Hi${RESET}" ;;
     medium) EFFORT_SECTION="${B_YELLOW}Med${RESET}" ;;
     low)    EFFORT_SECTION="${DIM}Lo${RESET}" ;;
     *)      EFFORT_SECTION="${DIM}${EFFORT_LEVEL}${RESET}" ;;
   esac
+fi
+
+# ─── Rate limits (5h / 7d, from .rate_limits.*) ──────────────────────────────
+RATE_LIMIT_SECTION=""
+_rl_fmt() {
+  # $1 = label (5h/7d), $2 = pct (may be decimal or empty)
+  local label=$1 pct_raw=$2 pct col
+  [ -z "$pct_raw" ] && return
+  pct=$(printf '%.0f' "$pct_raw" 2>/dev/null || echo 0)
+  col=$(colour_gradient "$pct")
+  printf '%b%s:%s%%%b' "$col" "$label" "$pct" "$RESET"
+}
+RL_5H_FMT=$(_rl_fmt "5h" "$RL_5H")
+RL_7D_FMT=$(_rl_fmt "7d" "$RL_7D")
+if [ -n "$RL_5H_FMT" ] && [ -n "$RL_7D_FMT" ]; then
+  RATE_LIMIT_SECTION="${RL_5H_FMT} ${RL_7D_FMT}"
+elif [ -n "$RL_5H_FMT" ]; then
+  RATE_LIMIT_SECTION="$RL_5H_FMT"
+elif [ -n "$RL_7D_FMT" ]; then
+  RATE_LIMIT_SECTION="$RL_7D_FMT"
 fi
 
 # ─── Session duration ─────────────────────────────────────────────────────────
@@ -263,6 +287,12 @@ LINE2=""
 # Duration
 if [ -n "$DURATION_SECTION" ]; then
   LINE2="${DURATION_SECTION}"
+fi
+
+# Rate limits (5h / 7d)
+if [ -n "$RATE_LIMIT_SECTION" ]; then
+  [ -n "$LINE2" ] && LINE2="${LINE2}${SEP}"
+  LINE2="${LINE2}${RATE_LIMIT_SECTION}"
 fi
 
 # Weather
