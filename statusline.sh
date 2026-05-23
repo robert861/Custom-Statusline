@@ -63,6 +63,8 @@ LINES_REM=$(get_val '.cost.total_lines_removed')
 EFFORT_LEVEL=$(get_val '.effort.level')
 RL_5H=$(get_val '.rate_limits.five_hour.used_percentage')
 RL_7D=$(get_val '.rate_limits.seven_day.used_percentage')
+RL_5H_RESET=$(get_val '.rate_limits.five_hour.resets_at')
+RL_7D_RESET=$(get_val '.rate_limits.seven_day.resets_at')
 
 # Derived values
 DIR_NAME="${CWD##*[/\\]}"
@@ -171,17 +173,29 @@ if [ -n "$EFFORT_LEVEL" ]; then
 fi
 
 # ─── Rate limits (5h / 7d, from .rate_limits.*) ──────────────────────────────
+# Format: "5h:23%/45%" — first = quota used (gradient colour), second = window
+# elapsed (dim). Compare them: usage > elapsed means you're burning faster than
+# the window refills; usage < elapsed means you're under pace.
 RATE_LIMIT_SECTION=""
 _rl_fmt() {
-  # $1 = label (5h/7d), $2 = pct (may be decimal or empty)
-  local label=$1 pct_raw=$2 pct col
+  # $1 = label (5h/7d), $2 = used_pct, $3 = resets_at epoch, $4 = window seconds
+  local label=$1 pct_raw=$2 reset=$3 window=$4
+  local pct col elapsed_pct now
   [ -z "$pct_raw" ] && return
   pct=$(printf '%.0f' "$pct_raw" 2>/dev/null || echo 0)
   col=$(colour_gradient "$pct")
-  printf '%b%s:%s%%%b' "$col" "$label" "$pct" "$RESET"
+  if [ -n "$reset" ] && [ "$window" -gt 0 ]; then
+    now=$(date +%s)
+    elapsed_pct=$(( (window - (reset - now)) * 100 / window ))
+    [ "$elapsed_pct" -lt 0 ] && elapsed_pct=0
+    [ "$elapsed_pct" -gt 100 ] && elapsed_pct=100
+    printf '%b%s:%s%%%b%b/%s%%%b' "$col" "$label" "$pct" "$RESET" "$DIM" "$elapsed_pct" "$RESET"
+  else
+    printf '%b%s:%s%%%b' "$col" "$label" "$pct" "$RESET"
+  fi
 }
-RL_5H_FMT=$(_rl_fmt "5h" "$RL_5H")
-RL_7D_FMT=$(_rl_fmt "7d" "$RL_7D")
+RL_5H_FMT=$(_rl_fmt "5h" "$RL_5H" "$RL_5H_RESET" 18000)
+RL_7D_FMT=$(_rl_fmt "7d" "$RL_7D" "$RL_7D_RESET" 604800)
 if [ -n "$RL_5H_FMT" ] && [ -n "$RL_7D_FMT" ]; then
   RATE_LIMIT_SECTION="${RL_5H_FMT} ${RL_7D_FMT}"
 elif [ -n "$RL_5H_FMT" ]; then
@@ -281,18 +295,18 @@ if [ -n "$CACHE_SECTION" ]; then
   LINE1="${LINE1}${CACHE_SECTION}"
 fi
 
-# ─── Line 2: Duration, Weather, Day & Time ──────────────────────────────────
+# ─── Line 2: Rate limits, Duration, Weather, Day & Time ─────────────────────
 LINE2=""
-
-# Duration
-if [ -n "$DURATION_SECTION" ]; then
-  LINE2="${DURATION_SECTION}"
-fi
 
 # Rate limits (5h / 7d)
 if [ -n "$RATE_LIMIT_SECTION" ]; then
+  LINE2="${RATE_LIMIT_SECTION}"
+fi
+
+# Duration
+if [ -n "$DURATION_SECTION" ]; then
   [ -n "$LINE2" ] && LINE2="${LINE2}${SEP}"
-  LINE2="${LINE2}${RATE_LIMIT_SECTION}"
+  LINE2="${LINE2}${DURATION_SECTION}"
 fi
 
 # Weather

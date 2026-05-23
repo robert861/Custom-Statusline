@@ -21,7 +21,7 @@ This is a custom statusline script for Claude Code. It runs as an external comma
 | Vim mode | `vim.mode` | `NOR` / `INS` | Green / Yellow (only when vim enabled) |
 | Cache hit ratio | `cache_read` / `cache_creation` tokens | `Cache:87%` | Gradient (only when tokens present) |
 | Effort level | `.effort.level` (JSON payload) | `Max` / `XHi` / `Hi` / `Med` / `Lo` | Red / Orange / Green / Yellow / Dim grey |
-| Rate limits | `.rate_limits.{five_hour,seven_day}.used_percentage` | `5h:23% 7d:91%` | Gradient (green/yellow/orange/red) |
+| Rate limits | `.rate_limits.{five_hour,seven_day}.{used_percentage,resets_at}` | `5h:23%/45% 7d:91%/30%` | Usage: gradient; elapsed: dim |
 
 ### Layout
 
@@ -32,7 +32,9 @@ Opus 4.7 Hi  Custom-Statusline | main ~2 +1 | Ctx:45% | NOR | Cache:87%
 
 ### Rate limits (5h / 7d)
 
-As of Claude Code v1.2.80+, `rate_limits.five_hour.used_percentage` and `rate_limits.seven_day.used_percentage` ship in the statusline JSON payload (Pro/Max subscribers, present after the first API response in a session). Each window may be independently absent — the script uses `// empty` guards and renders whichever values are available.
+As of Claude Code v1.2.80+, `rate_limits.five_hour` and `rate_limits.seven_day` ship in the statusline JSON payload (Pro/Max subscribers, present after the first API response in a session). Each window exposes `used_percentage` and `resets_at` (Unix epoch). Each window may be independently absent — the script uses `// empty` guards and renders whichever values are available.
+
+The display shows `5h:USED%/ELAPSED%` where ELAPSED is computed from `resets_at` against fixed window sizes (18000s for 5h, 604800s for 7d). Compare the two numbers at a glance: USED > ELAPSED means you're burning quota faster than the window refills.
 
 ### Not Working — Terminal Tab Title
 
