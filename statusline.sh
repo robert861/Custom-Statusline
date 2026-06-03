@@ -173,9 +173,13 @@ if [ -n "$EFFORT_LEVEL" ]; then
 fi
 
 # ─── Rate limits (5h / 7d, from .rate_limits.*) ──────────────────────────────
-# Format: "5h:23%/45%" — first = quota used (gradient colour), second = window
-# elapsed (dim). Compare them: usage > elapsed means you're burning faster than
-# the window refills; usage < elapsed means you're under pace.
+# Format: "5h:23%/45%" — first = quota used, second = window elapsed (dim).
+# Colour of the usage figure tracks pace against the window:
+#   green  — usage is comfortably under the elapsed-window percentage
+#   orange — usage is within 5 points of the elapsed percentage (catching up)
+#   red    — usage has overtaken the elapsed percentage (burning too fast)
+# When no reset epoch is available we can't compute pace, so fall back to the
+# plain context-style gradient.
 RATE_LIMIT_SECTION=""
 _rl_fmt() {
   # $1 = label (5h/7d), $2 = used_pct, $3 = resets_at epoch, $4 = window seconds
@@ -183,14 +187,18 @@ _rl_fmt() {
   local pct col elapsed_pct now
   [ -z "$pct_raw" ] && return
   pct=$(printf '%.0f' "$pct_raw" 2>/dev/null || echo 0)
-  col=$(colour_gradient "$pct")
   if [ -n "$reset" ] && [ "$window" -gt 0 ]; then
     now=$(date +%s)
     elapsed_pct=$(( (window - (reset - now)) * 100 / window ))
     [ "$elapsed_pct" -lt 0 ] && elapsed_pct=0
     [ "$elapsed_pct" -gt 100 ] && elapsed_pct=100
+    if   [ "$pct" -gt "$elapsed_pct" ];            then col="$B_RED"
+    elif [ "$pct" -ge $(( elapsed_pct - 5 )) ];    then col="$B_ORANGE"
+    else                                                col="$B_GREEN"
+    fi
     printf '%b%s:%s%%%b%b/%s%%%b' "$col" "$label" "$pct" "$RESET" "$DIM" "$elapsed_pct" "$RESET"
   else
+    col=$(colour_gradient "$pct")
     printf '%b%s:%s%%%b' "$col" "$label" "$pct" "$RESET"
   fi
 }
