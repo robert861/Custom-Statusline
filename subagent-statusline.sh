@@ -88,9 +88,13 @@ printf '%s' "$JSON" | jq -r '
 
   glyph=$(status_glyph "$status")
 
-  # Name (fall back to label), capped so the prefix never blows out the row
-  name_disp="${name:-$label}"
-  [ -z "$name_disp" ] && name_disp="agent"
+  # Name (fall back to label, which is what local agents actually populate),
+  # capped so the prefix never blows out the row.
+  name_src="${name:-$label}"
+  [ -z "$name_src" ] && name_src="agent"
+  # Local agents repeat the label verbatim as the description — don't print it twice.
+  [ "$desc" = "$name_src" ] && desc=""
+  name_disp="$name_src"
   [ "${#name_disp}" -gt 28 ] && name_disp="${name_disp:0:27}…"
 
   # Elapsed + average token rate since start

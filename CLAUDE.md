@@ -97,6 +97,15 @@ The script must output **a single line** per `echo` (multiple `echo`s render as 
 - `.columns` — usable row width (use it to size/truncate output)
 - `.tasks[]` — one entry per visible subagent, each with `id`, `name`, `type`, `status`, `description`, `label`, `startTime`, `tokenCount`, `tokenSamples`, `cwd`
 
+**Confirmed from a live capture** (`local_agent` task, the kind Task/workflow fan-outs produce):
+
+- `name` is **absent** — local agents populate `label` instead, and `description` is usually identical to `label`. The script falls back name→label and suppresses the description when it just repeats the label.
+- `type` observed as `"local_agent"`.
+- `startTime` is **epoch milliseconds** (13 digits), e.g. `1781417367541`.
+- `tokenSamples` is a **flat array of numbers** (a rolling history of token counts, e.g. `[60000,65000,73456]`), not objects. The sampling interval isn't given, so the script uses an average rate instead.
+- The top-level payload also carries `session_id`, `transcript_path`, and `cwd`.
+- Completed/failed rows are rarely seen: once an agent finishes it leaves the panel, so no override fires for it. The glyph map still covers those states for robustness.
+
 **Output contract:** print **one JSON line per row to override**, `{"id":"<task id>","content":"<row body>"}`. `content` is rendered as-is (ANSI colours + OSC 8 links OK). Omit a task's `id` to keep its default row; emit empty `content` to hide that row.
 
 **What our script renders** per subagent:
@@ -106,15 +115,15 @@ The script must output **a single line** per `echo` (multiple `echo`s render as 
   ▸ green=running  ✓ green=done  ○ grey=pending  ✗ red=failed  ⊘ yellow=cancelled
 ```
 
-- `elapsed` is `now − startTime`; `startTime` is normalised whether it arrives as epoch-ms, epoch-s, or an ISO string.
-- token rate is the **average** since start (`tokenCount / elapsed`) — `tokenSamples` is not yet consumed.
-- `description` is truncated to fit `.columns`; the name is capped at 28 chars.
+- `elapsed` is `now − startTime`; `startTime` is normalised whether it arrives as epoch-ms (the observed case), epoch-s, or an ISO string.
+- token rate is the **average** since start (`tokenCount / elapsed`) — `tokenSamples` is captured but not yet consumed.
+- `description` is shown only when it differs from the name/label (avoids the duplicated string local agents emit), and is truncated to fit `.columns`; the name is capped at 28 chars.
 
 **Implementation notes:**
 
 - Fields are joined for `read` with the **unit separator (`0x1F`)**, not tab — tab is an IFS *whitespace* char, so `read` would collapse an empty field (e.g. a missing `label`) and shift every column. `IFS=$'\037'` preserves empty fields.
 - `content` is emitted via `jq -nc --arg` so the ANSI control bytes are safely JSON-escaped.
-- The exact formats of `startTime` and `tokenSamples` aren't pinned down in the docs, so parsing is defensive. To capture a real payload for tuning, launch with `SUBAGENT_SL_DEBUG=1 claude` — each invocation appends raw stdin to `~/.claude/subagent-sl-debug.json`.
+- Parsing stays defensive even though the formats above are now confirmed (the docs don't guarantee them). To re-capture a real payload for tuning, launch with `SUBAGENT_SL_DEBUG=1 claude` and spawn any subagent — each tick appends raw stdin to `~/.claude/subagent-sl-debug.json`. (subagentStatusLine ticks fire only while a subagent is visible.)
 - Same gating as `statusLine`: requires workspace trust, and is disabled if `disableAllHooks` is `true`.
 
 Register alongside `statusLine` in `~/.claude/settings.json`:
